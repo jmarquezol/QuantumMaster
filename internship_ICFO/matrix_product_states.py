@@ -1,4 +1,3 @@
-
 import numpy as np
 
 class MPS:
@@ -16,12 +15,12 @@ class MPS:
         self.N, self.d_phys = N, d_phys
         self.A = [item for item in A] 
 
-        self.right_canonical_form()
+        self.left_canonical_form()
         self.canonical_center = self.N-1
         
-    def right_canonical_form(self):
+    def left_canonical_form(self):
         """
-        Converts the MPS into right canonical form using QR decomposition
+        Converts the MPS into left canonical form using QR decomposition
         """
 
         for n in range(self.N-1):
@@ -32,9 +31,12 @@ class MPS:
             # reshape A[n] into a matrix of shape (d_phys*b_dim_left, b_dim_right)
             q, r = np.linalg.qr(self.A[n].reshape(shape[0]*shape[1], shape[2]), 
                                 mode = 'reduced')
+            # shape of q is (d * b_dim_left, K)
+            # shape of r is (K, b_dim_right)
+            # K = b_dim_right
 
             self.A[n] = q.reshape(shape[0], shape[1], -1) # store Q back in A[n] in the original shape (with updated b_dim_right represented by "-1")
-            self.A[n+1] = np.tensordot(self.A[n+1], r, axes = (1, 1)) # contract r [shape = ()] into A[n+1]; axes=( [legs_of_A], [legs_of_r] )
+            self.A[n+1] = np.tensordot(self.A[n+1], r, axes = (1, 1)) # contract (right leg of) r and (left leg of) A[n+1]; axes=( [legs_of_A], [legs_of_r] )
             self.A[n+1] = np.transpose(self.A[n+1], axes = (0, 2, 1)) # shape adjustment after contraction wih tesor product
 
         self.canonical_center = self.N-1 # Every tensor from 0 to N-2 is a "Left Isometry" (A[n]^\dagger A[n] = I), while A[N-1] holds the normalization information of the wf
@@ -130,8 +132,8 @@ class MPS:
         Compresses the MPS to a maximum bond dimension using SVD.
         Sweeps Right -> Left (N-1 to 0).
         """
-        # 1st start with QR decomposition (weights are at the right end in the beginning)
-        self.right_canonical_form() 
+        # 1st start with QR decomposition (weights are at the right end)
+        self.left_canonical_form() 
         
         # 2nd iterate backwards from N-1 down to 1 (site 0 doesn't need compression since we are compressing the left bonds)
         for n in range(self.N - 1, 0, -1):

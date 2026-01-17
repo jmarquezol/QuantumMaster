@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # ------------------------------------------------------------
 # Physical constants
 # ------------------------------------------------------------
-Dx = 1e-10               # Spatial step (m)
+Dx = 1e-10               # Spatial step (m) 1 Angstrom
 L = 2e-8                 # Box length (m)
 m = 0.063 * 9.109e-31    # Effective electron mass (kg)
 h = 1.054e-34            # Reduced Planck constant (J·s)
@@ -14,7 +14,7 @@ T = 298                  # Temperature (K)
 Area = 1e-12             # Device cross-sectional area (m^2)
 
 # ------------------------------------------------------------
-# Spatial discretization
+# Spatial discretization (Grid Setup)
 # ------------------------------------------------------------
 xpoints = int(np.floor(L / Dx))
 x = np.arange(1, xpoints + 1) * Dx
@@ -39,7 +39,7 @@ voltages = np.linspace(0, 1, numvolts)
 V = np.zeros(numvolts)
 I = np.zeros(numvolts)
 
-Vb = 0.0   # zero voltage applied
+Vb = 0.3   # zero voltage applied
 dE = 0.001  # Energy increment (eV)
 Efc = 0.005 - Vb  # Fermi level (drain)
 Efs = 0.005       # Fermi level (source)
