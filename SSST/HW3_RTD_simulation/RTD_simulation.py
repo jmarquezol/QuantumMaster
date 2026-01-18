@@ -125,11 +125,6 @@ def get_transmission(Energy, Potential):
             
     return T_prob
 
-
-def fermi_dirac(E, Mu, T):
-    """ Fermi-Dirac distribution """
-    return 1.0 / (1.0 + np.exp((E - Mu) * qe / (Kb * T)))
-
 def simulate_multibarrier(num_barriers, W_b=4e-9, W_w=10e-9, V_height=0.3):
     """
     Constructs a potential with 'num_barriers' and computes its transmission coeff.
@@ -184,7 +179,7 @@ Energies = np.linspace(0.001, E_max, E_steps)
 T_zero_bias = get_transmission(Energies, U0)
 
 plt.figure(figsize=(10, 6))
-plt.plot(Energies, T_zero_bias, 'r-', linewidth=2)
+plt.plot(Energies, T_zero_bias, 'b-', linewidth=2)
 plt.title(f'Transmission Probability at V=0\nBarrier={W_barrier*1e9}nm, Well={W_well*1e9}nm')
 plt.xlabel('Energy (eV)')
 plt.ylabel('T(E)')
@@ -195,13 +190,9 @@ plt.show()
 # PART 2: I-V CHARACTERISTIC
 # -----------------------------------------------------------------------------
 
-# We get macroscopic current I from the quantum probability T using the Landauer-Büttiker formula
-# As we change the voltage V, a window f_L(E) - f_R(E) = E_F - (E_F - eV) = eV opens. 
-# Only electrons inside this window contribute significantly to the current
-
 # Voltage Grid
 V_max = 0.6 # max value enough to see the negative slope region, in Volts
-V_steps = 100
+V_steps = 150
 Voltages = np.linspace(0, V_max, V_steps)
 Currents = np.zeros(V_steps)
 
@@ -230,20 +221,21 @@ for i, Vb in enumerate(Voltages):
     mu_L = Ef           # Source fixed
     mu_R = Ef - Vb      # Drain drops by Vb
     
-    # 4. Landauer-Büttiker Integration
-    # I = (2e/h) * Integral [ T(E) * (fL - fR) ] dE
-    # Note the integral is in Joules
-    fL = fermi_dirac(Energies, mu_L, T)
-    fR = fermi_dirac(Energies, mu_R, T)
+    # 4. Equation 3 (to compute J(V))
+    # Note Energies are in eV, so we multiply by qe -> Joules
+    arg_L = (mu_L - Energies) * qe / (Kb * T)
+    arg_R = (mu_R - Energies) * qe / (Kb * T)
     
-    integrand = Trans_V * (fL - fR)
-    current_integral = np.trapezoid(integrand, Energies) # Numerical integration
+    integrand = Trans_V * np.log( (1 + np.exp(arg_L)) / (1 + np.exp(arg_R)))
+    integral = np.trapezoid(integrand, Energies) * qe   # Numerical integration (in Joules)
+
+    J_V = (qe * m * Kb * T) / (2 * np.pi**2 * h_bar**3) * integral
     
-    Currents[i] = (2 * qe / h_bar / (2*np.pi)) * (current_integral * qe) # Factor qe converts dE (eV) to Joules
+    Currents[i] = J_V * Area
 
 
 plt.figure(figsize=(10, 6))
-plt.plot(Voltages, Currents, 'b-', linewidth=2)
+plt.plot(Voltages, Currents, 'r-', linewidth=2)
 plt.title('I-V Characteristic of RTD')
 plt.xlabel('Voltage (V)')
 plt.ylabel('Current (A)')
@@ -255,7 +247,7 @@ plt.show()
 # -----------------------------------------------------------------------------
 
 # Plotting Band Structure Development
-N_values = [5, 20, 50]
+N_values = [2, 5, 10, 20]
 
 for i, N in enumerate(N_values):
     x_mb, U_mb, T_mb = simulate_multibarrier(N, W_barrier, W_well, V0)
