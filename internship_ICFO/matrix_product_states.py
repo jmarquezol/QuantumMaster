@@ -298,5 +298,3 @@ class MPS:
         W = np.zeros((d_phys, d_phys, 1, 1)) # shape: (d_out, d_in, b_dim_L, b_dim_R), where bond dims are 1 for product operators (no entanglement between sites)
         W[:, :, 0, 0] = sigma_x
         return [W.copy() for _ in range(N)]
-
-

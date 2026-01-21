@@ -1,6 +1,7 @@
 import numpy as np
 from matrix_product_states import MPS
 import opt_einsum as oe
+import itertools
 
 class PEPS:
 
@@ -276,6 +277,9 @@ class PEPS:
         :param J: hopping constant
         """
 
+        d_phys = 2  # spin up/down
+        D = 2       # fix bond dim for Ising PEPS
+
         # Boltzmann Matrix W (containing interaction weights)
         # W = [W_00 W_01]
         #     [W_10 W_11]   st W_00 = interaction between spin up and neighbour spin up
@@ -320,8 +324,31 @@ class PEPS:
             grid_tensors.append(row_tensors)
         
         return cls(Lx, Ly, d_phys, D, grid_tensors)
+    
+    @classmethod
+    def compute_Z_brute_force(cls, Lx, Ly, beta, J=1.0):
+        """
+        Computes exact partition function Z using brute-force summation over all spin configurations.
+        Problem scales as O(2^(Lx*Ly)) so it's only feasible for small systems
+        """
+        N = Lx * Ly
+        Z = 0.0
 
+        # For loop over all spin configurations of N spins (-1, +1)
+        for config_spins in itertools.product([-1, +1], repeat=N):
+            # reshape config into 2D grid
+            grid_spins = np.array(config_spins).reshape((Lx, Ly))
 
+            energy = 0.0
 
-        
+            # Sum over all horizontal pair bonds
+            horizontal_pairs = grid_spins[:, :-1] * grid_spins[:, 1:] # for each row, multiply spin with right neighbour
+            energy += - J * np.sum(horizontal_pairs)
 
+            # Sum over all vertical pair bonds
+            vertical_pairs = grid_spins[:-1, :] * grid_spins[1:, :]   # for each column, multiply spin with bottom neighbour
+            energy += - J * np.sum(vertical_pairs)
+
+            Z += np.exp(- beta * energy)
+
+        return Z

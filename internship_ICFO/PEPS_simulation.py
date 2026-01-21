@@ -3,7 +3,7 @@ import time
 from peps import PEPS
 
 # --- PARAMETERS ---
-Lx, Ly = 11, 11
+L = 11
 d_phys = 2
 D = 2           # bond dim of the PEPS
 D_bound = 4     # max bond dim for the boundary MPS

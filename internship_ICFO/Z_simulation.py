@@ -46,3 +46,38 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
+
+
+# ------------------------------------------------------------------
+# COMPARISON: Z FROM BRUTE FORCE VS Z FROM EXACT PEPS CONTRACTION
+# ------------------------------------------------------------------
+beta = 0.3
+L_small = 4
+
+ising_peps = PEPS.create_ising_2d(Lx=L_small, Ly=L_small, beta=beta, J=J)
+z_exact = ising_peps.contract_2d_exact()
+
+# Brute force Z
+z_brute = PEPS.compute_Z_brute_force(Lx=L_small, Ly=L_small, beta=beta, J=J)
+
+print(f"\nBrute Force Z: {z_brute:.6e}")
+print(f"Exact PEPS Z:   {z_exact:.6e}")
+
+# Relative Error:
+rel_error = abs(z_brute - z_exact) / z_exact
+print(f"Relative Error: {rel_error:.2e}")
+
+# ------------------------------------------------------------------
+# COMPARISON: Z FROM BRUTE FORCE VS Z FROM APPROX PEPS CONTRACTION
+# ------------------------------------------------------------------beta = 0.3
+
+z_approx = ising_peps.contract_2d(D_bound=D_bound)
+
+print(f"\nBrute Force Z: {z_brute:.6e}")
+print(f"Approx PEPS Z:   {z_approx:.6e}")
+
+# Relative Error:
+rel_error = abs(z_brute - z_approx) / z_exact
+print(f"Relative Error: {rel_error:.2e}")
+
+
