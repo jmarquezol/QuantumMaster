@@ -1,0 +1,53 @@
+def diffusion_block_encoding(n_qubits):
+    """
+    Tridiagonal matrix with elements $(-2, 1, 1)$
+    Encoded as A/4 (normalized)
+    
+    Subspace: Encoded on |00> state of the ancilla.
+    """
+    # Create registers local to this block
+    anc = QuantumRegister(2, 'anc') 
+    main = QuantumRegister(n_qubits, 'main')
+    qc = QuantumCircuit(anc, main)
+
+    # State preparation
+    coeffs = [0.5, np.sqrt(0.5), 0.5, 0.0]
+    prep_gate = StatePreparation(coeffs)
+    prep_gate.label = "G_prep"
+    qc.append(prep_gate, anc)
+    
+    # Minus sign fix
+    qc.z(anc[0])
+
+    # Move to Fourier space to apply shifts as phases
+    qft_gate = QFT(n_qubits, do_swaps=True).to_gate()
+    qc.append(qft_gate, main)
+
+
+    for i in range(n_qubits):
+        angle = -2 * np.pi / (2**(i + 1))
+        # Targeting main[n-1-i] handles bit ordering if using do_swaps=True
+        qc.p(angle, main[n_qubits - 1 - i])
+
+    # Now we add back offsets controlled by Ancilla:
+    # Ancilla |00> (Int 0): Total Shift = -1 + 0 = -1 (Correct)
+    # Ancilla |01> (Int 1): Total Shift = -1 + 1 =  0 (Correct, Identity)
+    # Ancilla |10> (Int 2): Total Shift = -1 + 2 = +1 (Correct)
+    
+    # Controlled-Add 1 (Controlled by anc[0])
+    for i in range(n_qubits):
+        angle = 2 * np.pi / (2**(i + 1))
+        qc.cp(angle, anc[0], main[n_qubits - 1 - i])
+
+    # Controlled-Add 2 (Controlled by anc[1])
+    for i in range(n_qubits):
+        angle = 4 * np.pi / (2**(i + 1))
+        qc.cp(angle, anc[1], main[n_qubits - 1 - i])
+
+    # Back to standard basis
+    iqft_gate = QFT(n_qubits, inverse=True, do_swaps=True).to_gate()
+    qc.append(iqft_gate, main)
+
+    qc.append(prep_gate.inverse(), anc)
+
+    return qc
