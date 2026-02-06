@@ -19,8 +19,8 @@ T = 298                 # Temperature (K)
 Area = 1e-12            # Cross-sectional area (m^2)
 
 # Geometry parameters
-W_barrier = 4e-9        # 4 nm
-W_well = 10e-9          # 10 nm
+W_barrier = 2e-9        # 2 nm
+W_well = 5e-9           # 5 nm
 V0 = 0.3                # Barrier height/Potential offset (eV)
 Ef = 0.005               # Fermi energy (eV)
 
@@ -171,8 +171,8 @@ def simulate_multibarrier(num_barriers, W_b=4e-9, W_w=10e-9, V_height=0.3):
 # -----------------------------------------------------------------------------
 
 # Energy Grid
-E_max = 0.5 # eV (Up to barrier height + bit more)
-E_steps = 5000
+E_max = 0.25 # eV (Up to barrier height + bit more)
+E_steps = 1000
 Energies = np.linspace(0.001, E_max, E_steps) 
 
 # Plotting T(E) for V=0 first (no bias)
