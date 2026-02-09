@@ -37,7 +37,7 @@ for beta in beta_values:
 
 # Plotting
 plt.figure(figsize=(10, 5))
-plt.semilogy(beta_values, error_list, 'ro-')
+plt.semilogy(beta_values, error_list, 'r-')
 plt.axvline(0.4407, color='k', linestyle=':', label='Critical Temperature')
 plt.xlabel(r' Temperature, $\beta$')
 plt.ylabel('Relative Error')
