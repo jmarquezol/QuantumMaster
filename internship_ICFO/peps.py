@@ -103,22 +103,38 @@ class PEPS:
         return np.real(result)
     
 
-    def contract_2d(self, D_bound):
+    def contract_2d(self, D_bound, fixed_config=None):
         """"
         Computes contraction of rectangular and finite PEPS.
         We sum over the physical index of each tensor
 
         :param D_bound: max bond dim D' for the boundary MPS
+        :fixed_config: 2D array where fixed sites have values 0 or 1
+                       Sites with -1 value are not fixed and we sum over their physical index as usual
         :return: scalar result of contraction
         """
+
+        # Helper function
+        def get_tensor_with_fixed_config(x, y, T):
+            val = None
+            if fixed_config is not None:
+                v = fixed_config[x][y]
+                if v != -1: val = v
+
+            if val is not None:
+                # If site is fixed, we select the corresponding slice of the tensor
+                # e.g. if val = 0, we take T[0, :, :, :, :]
+                return T[val, :, :, :, :]
+            else:
+                return np.sum(T, axis=0) # sum over physical index as usual
 
         # 1. BOUNDARY MPS (top row)
         mps_tensors = []
         for y in range(self.Ly):
-            T = self.A[0][y]                # shape = (d_phys, L, U=1, R, D9)
+            T_orig = self.A[0][y]                # shape = (d_phys, L, U=1, R, D)
 
             # Sum over physical index to trace it out
-            temp = np.sum(T, axis=0)        # shape = (L, U=1, R, D)
+            temp = get_tensor_with_fixed_config(0, y, T_orig)        # shape = (L, U=1, R, D)
             temp = np.squeeze(temp, axis=1) # squeeze over axis 1 to remove U=1. new shape = (L, R, D)
 
             # Reshape it as a MPS w/ shape = (D, L, R) 
@@ -141,9 +157,9 @@ class PEPS:
 
             mpo_tensors = []
             for y in range(self.Ly):
-                W = self.A[x][y]
+                W_orig = self.A[x][y]
 
-                temp = np.sum(W, axis = 0)      # shape = (L, U, R, D)
+                temp = get_tensor_with_fixed_config(x, y, W_orig)      # shape = (L, U, R, D)
 
                 # MPO structure/shape = (phys_out, phys_in, Left, Right)
                 # input (from prev row) = up leg
@@ -352,3 +368,69 @@ class PEPS:
             Z += np.exp(- beta * energy)
 
         return Z
+
+
+    def sample_configuration(self, D_bound):
+        """
+        Generates a single configuration sample from the PEPS distribution 
+        using the Chain Rule and Baye's Rule.
+        
+        :param D_bound: bond dimension for the boundary contraction
+        Returns: 
+            (config, log_prob)
+            - config: 2D array of spins (0 or 1)
+            - log_prob: The natural log of the probability P(config) according to the TN.        
+        """
+        # Initialize config. ( -1 = Free )
+        current_config = np.full((self.Lx, self.Ly), -1, dtype=int)
+        log_prob = 0.0  # Accumulator for log(P(s_1)) + log(P(s_2|s_1)) + ...
+                
+        for x in range(self.Lx):
+            for y in range(self.Ly):
+                # Wompute the weights for the two possible spin states at each site
+                # conditioned on the already sampled spins (current_config) and the TN structure
+
+                # Weight for Spin UP (0)
+                config_try_0 = current_config.copy()
+                config_try_0[x, y] = 0
+                
+                weight_0 = self.contract_2d(D_bound, fixed_config=config_try_0)
+                
+                # Compute Weight for Spin DOWN (1)
+                config_try_1 = current_config.copy()
+                config_try_1[x, y] = 1
+                
+                weight_1 = self.contract_2d(D_bound, fixed_config=config_try_1)
+                
+                # Avoid negative weights due to numerical instability
+                weight_0 = max(0.0, weight_0)
+                weight_1 = max(0.0, weight_1)
+                
+                total_weight = weight_0 + weight_1
+                
+                # Conditional Probability P(s_i | s_{<i}) ---
+                if total_weight < 1e-15:
+                    p0 = 0.5 # in case of numerical instability, we assign equal probability to both spin states
+                else:
+                    p0 = weight_0 / total_weight
+                
+                # Sample a random number to decide the spin state based on the computed probability
+                r = np.random.rand()
+                
+                if r < p0:
+                    chosen_spin = 0
+                    p_chosen = p0
+                else:
+                    chosen_spin = 1
+                    p_chosen = 1.0 - p0
+                
+                # Update current configuration for the next iterations
+                current_config[x, y] = chosen_spin
+
+                # Accumulate Log Prob (we use log to avoid underflow)
+                if p_chosen < 1e-15:
+                    log_prob = - np.inf
+                else:
+                    log_prob += np.log(p_chosen)
+                
+        return current_config, log_prob
