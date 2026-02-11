@@ -64,6 +64,7 @@ class MPS:
         
         return res[0,0]
 
+
     def norm_canonical(self):
         """
         Computes normm using the canonical form of the MPS (valid only if the MPS is in right canonical form)
@@ -82,7 +83,6 @@ class MPS:
 
         for n in range(self.N):
             A = self.A[n]
-            A_conj = A.conj()
             # both with shape: (d, L, R)
 
             # 1st step: contract env with ket A over the left bond
@@ -91,6 +91,33 @@ class MPS:
             # 2nd step: contract the result with bra A_conj over physical index and left bond
             env = np.tensordot(self.A[n].conj(), temp, axes = ([0,1], [1,0])) # shape: (R_bra, R_ket) after contraction
         return np.sqrt(np.real(env[0,0]))
+    
+    def expectation_value(self, op, site_idx):
+        """
+        Computes the expectation value <Psi|op|Psi> at a single site.
+        
+        :param op: Single site operator (d x d matrix)
+        :param site_index: Index of the site to apply the operator
+        """
+        env = np.eye(1) # initial environment
+
+        for n in range(self.N):
+            tensor = self.A[n] # Shape (d, L, R)
+            
+            # If this is the target site, we apply the operator to the ket
+            if n == site_idx:
+                # Contract op with physical leg of tensor
+                # op is (d, d), tensor is (d, L, R) -> result (d, L, R)
+                tensor = np.tensordot(op, tensor, axes=(1, 0))
+            
+            # Standard contraction (same as norm_general)
+            # 1. Contract env with ket tensor
+            temp = np.tensordot(env, tensor, axes=(1, 1)) # (bra_L, d, R)
+            
+            # 2. Contract with bra tensor (conjugate)
+            env = np.tensordot(self.A[n].conj(), temp, axes=([0, 1], [1, 0])) # (R_bra, R_ket)
+
+        return np.real(env[0, 0])
 
     def apply_mpo(self, mpo):
         """
