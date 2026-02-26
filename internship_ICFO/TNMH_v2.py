@@ -45,14 +45,13 @@ Lx, Ly = 4, 4
 beta = 0.44
 J = 1.0
 
-
-print(f"Starting TNMH Algorithm (Beta={beta}, Samples={N_samples})...")
+print(f"Starting TNMH Algorithm (Beta={beta}, Samples={N_samples}, Grid={Lx}x{Ly})...")
 
 # Create PEPS Object
 ising = PEPS.create_ising_2d(Lx, Ly, beta=beta, J=J)
 
-# Initialize Markov Chain (Step t=0)
-current_config, current_log_prob = ising.sample_configuration(D_bound=10)
+# Initialize Markov Chain (Step t=0) using the OPTIMIZED method
+current_config, current_log_prob = ising.sample_config_opt(D_bound=D_bound)
 current_energy = measure_energy(current_config, J)
 
 mag_history = []
@@ -63,18 +62,16 @@ pbar = tqdm(range(N_samples), desc="MCMC Evolution")
 
 for t in pbar:
     # 1. PROPOSE (sample a new candidate config from the PEPS distribution)
-    new_config, new_log_prob = ising.sample_configuration(D_bound)
+    # MUST USE sample_config_opt HERE
+    new_config, new_log_prob = ising.sample_config_opt(D_bound=D_bound)
     new_energy = measure_energy(new_config, J)
 
-    # 2. ACCEPT/REJECT (Metropolis-Hastings Criterion)   
-    #   ratio = [ P_TN(w) / P_TN(w') ] * [ exp(-beta E(w')) / exp(-beta E(w)) ]
-    #   log_ratio = (log_P_TN(w) - log_P_TN(w')) + (-beta * (E' - E))
+    # 2. ACCEPT/REJECT 
     log_TN_ratio = current_log_prob - new_log_prob
     log_boltzmann_ratio = -beta * (new_energy - current_energy)
     log_acceptance = log_TN_ratio + log_boltzmann_ratio
 
     if np.log(np.random.rand()) < log_acceptance:
-        # Accept the new configuration
         current_config = new_config
         current_log_prob = new_log_prob
         current_energy = new_energy
@@ -82,7 +79,7 @@ for t in pbar:
 
     # 3. MEASURE
     m = measure_magnetization(current_config)
-    e = current_energy / (Lx * Ly)  # energy per site
+    e = current_energy / (Lx * Ly) 
     
     mag_history.append(m)
     energy_history.append(e)
@@ -91,25 +88,21 @@ for t in pbar:
         running_acc_rate = acceptance_count / (t + 1)
         pbar.set_postfix({"Acc": f"{running_acc_rate:.1%}"})
 
-
 # ANALYSIS 
 acceptance_rate = acceptance_count / N_samples
 
-# Statistics
-burn_in = int(0.2 * N_samples)  # discard first 20% as burn-in
+burn_in = int(0.2 * N_samples)
 mag_history = mag_history[burn_in:]
 energy_history = energy_history[burn_in:]
 
 N_eff = len(mag_history)
-
 avg_mag = np.mean(mag_history)
 avg_energy = np.mean(energy_history)
-
 std_mag = np.std(mag_history) / np.sqrt(N_eff)
 std_energy = np.std(energy_history) / np.sqrt(N_eff)
 
 print("\nRESULTS:")
-print(f"\nAcceptance Rate:     {acceptance_rate:.2%}")
+print(f"Acceptance Rate:     {acceptance_rate:.2%}")
 print(f"Average Magnetization: {avg_mag:.5f} +/- {std_mag:.5f}")
 print(f"Average Energy:        {avg_energy:.5f} +/- {std_energy:.5f}")
 
@@ -117,24 +110,19 @@ print(f"Average Energy:        {avg_energy:.5f} +/- {std_energy:.5f}")
 fig, ax1 = plt.subplots(figsize=(10, 6))
 x_axis = np.arange(1, N_eff + 1)
 
-# Magnetization Plot (Left Axis)
 color_mag = 'tab:blue'
 ax1.set_xlabel('Sample Number')
 ax1.set_ylabel('Magnetization <M>', color=color_mag, fontweight='bold')
-ax1.plot(x_axis, np.cumsum(mag_history) / x_axis, 
-         color=color_mag, lw=2, label='Magnetization')
+ax1.plot(x_axis, np.cumsum(mag_history) / x_axis, color=color_mag, lw=2, label='Magnetization')
 ax1.tick_params(axis='y', labelcolor=color_mag)
 ax1.grid(True, alpha=0.3)
 
 ax2 = ax1.twinx()  
-
-# Energy Plot (Right Axis)
 color_eng = 'tab:red'
 ax2.set_ylabel('Energy <E>', color=color_eng, fontweight='bold')
-ax2.plot(x_axis, np.cumsum(energy_history) / x_axis, 
-         color=color_eng, linestyle='--', lw=2, label='Energy')
+ax2.plot(x_axis, np.cumsum(energy_history) / x_axis, color=color_eng, linestyle='--', lw=2, label='Energy')
 ax2.tick_params(axis='y', labelcolor=color_eng)
 
-plt.title(f"Convergence of MC Indep Sampling (beta={beta}, Grid {Lx}x{Ly})")
+plt.title(f"Convergence of MC Indep Sampling (optimized) (beta={beta}, Grid {Lx}x{Ly})")
 fig.tight_layout()
 plt.show()

@@ -91,6 +91,15 @@ class MPS:
             # 2nd step: contract the result with bra A_conj over physical index and left bond
             env = np.tensordot(self.A[n].conj(), temp, axes = ([0,1], [1,0])) # shape: (R_bra, R_ket) after contraction
         return np.sqrt(np.real(env[0,0]))
+
+    def normalize_tensors(self):
+        """
+        Divides each tensor by its maximum absolute value.
+        """
+        for n in range(self.N):
+            norm_factor = np.max(np.abs(self.A[n]))
+            if norm_factor > 0:
+                self.A[n] /= norm_factor
     
     def expectation_value(self, op, site_idx):
         """

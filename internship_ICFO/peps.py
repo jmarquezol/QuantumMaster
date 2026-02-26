@@ -368,7 +368,9 @@ class PEPS:
             Z += np.exp(- beta * energy)
 
         return Z
+    
 
+    # SAMPLING CONFIGURATIONS FROM THE PEPS DISTRIBUTION:
 
     def sample_configuration(self, D_bound):
         """
@@ -387,7 +389,7 @@ class PEPS:
                 
         for x in range(self.Lx):
             for y in range(self.Ly):
-                # Wompute the weights for the two possible spin states at each site
+                # Compute the weights for the two possible spin states at each site
                 # conditioned on the already sampled spins (current_config) and the TN structure
 
                 # Weight for Spin UP (0)
@@ -434,3 +436,226 @@ class PEPS:
                     log_prob += np.log(p_chosen)
                 
         return current_config, log_prob
+    
+
+    # optimized version:
+    def row_to_mps(self, x):
+        """
+        Converts a PEPS row x into an MPS.
+        Desigdned for the bottom boundary (down leg has dim=1)
+        """
+        mps_tensors = []
+        for y in range(self.Ly):
+            T = self.A[x][y]
+            temp = np.sum(T, axis=0) # sum over physical index. shape = (L, U, R, D)
+            temp = np.squeeze(temp, axis=3) # squeeze over down leg (dim=1). shape = (L, U, R)
+            temp = np.transpose(temp, (1, 0, 2)) # shape = (physical, left, right)
+            mps_tensors.append(temp)
+
+        return MPS(self.Ly, self.D, mps_tensors)
+    
+    def row_to_mpo(self, x):
+        """
+        Converts an intermediate PEPS row x into an MPO
+        PEP shape = (d_phys, L, U, R, D)
+        MPO final shape = (phys_out, phys_in, L, R)
+        """
+        mpo_tensors = []
+        for y in range(self.Ly):
+            T = self.A[x][y]
+            temp = np.sum(T, axis=0)
+            temp = np.transpose(temp, (1, 3, 0, 2))
+            mpo_tensors.append(temp)
+        
+        return mpo_tensors
+    
+    def compute_bottom_env(self, D_bound):
+        """
+        Sweeps from bottom to top, creating a boundary MPS for each row
+        """
+        bottom_envs = [None] * self.Lx
+
+        current_bottom_mps = self.row_to_mps(self.Lx - 1)
+        bottom_envs[self.Lx - 1] = current_bottom_mps
+
+        for x in range(self.Lx - 2, 0, -1):
+            row_mpo = self.row_to_mpo(x)
+
+            # Apply MPO to current boundary MPS and compress
+            current_bottom_mps = current_bottom_mps.apply_mpo(row_mpo)
+            current_bottom_mps.normalize_tensors()
+            current_bottom_mps.compress(max_bond_dim = D_bound)
+
+            bottom_envs[x] = current_bottom_mps
+
+        return bottom_envs
+    
+    def eff_row_mps(self, x, top_env, bottom_env):
+        """
+        Sandwiches row x between top and bottom envs to create a 1D MPS
+        whose physical leg = spin probability of row x
+        """
+        mps_tensors = []
+        for y in range(self.Ly):
+            T = self.A[x][y] # shape = (d_phys, L, U, R, D)
+
+            # Contract with top env if it exists
+            if top_env is not None:
+                T_top = top_env.A[y] # shape = (D_top, L_top, R_top)
+                temp = np.tensordot(T_top, T, axes=([0], [2])) # shape = (L_top, R_top, d_phys, L, R, D)
+                temp = np.transpose(temp, (2, 0, 3, 1, 4, 5)) # shape = (d_phys, L_top, L, R_top, R, D)
+            else:
+                # we are in the top row (x=0), so U = 1 and we squeeze it
+                temp = np.squeeze(T, axis=2) # shape = (d_phys, L, R, D)
+                temp = np.expand_dims(temp, axis=(1, 3)) # shape = (d_phys, 1, L, 1, R, D)
+
+
+            # Contract with bottom env if it exists
+            if bottom_env is not None:
+                T_bottom = bottom_env.A[y] # shape = (D_bottom, L_bottom, R_bottom)
+                temp = np.tensordot(temp, T_bottom, axes=([5], [0])) # shape = (d_phys, L_top, L, R_top, R, L_bottom, R_bottom)
+                temp = np.transpose(temp, (0, 1, 2, 5, 3, 4, 6)) # shape = (d_phys, L_top, L, L_bottom, R_top, R, R_bottom)
+            else:
+                # we are in the bottom row (x=Lx-1), so D = 1 and we squeeze it
+                temp = np.squeeze(temp, axis=5) # shape = (d_phys, L_top, L, R_top, R)
+                temp = np.expand_dims(temp, axis=(3, 6)) # shape = (d_phys, L_top, L, 1, R_top, R, 1)
+    
+            # Fuse left and right legs together to get MPS structure (d_phys, left, right)
+            shape = temp.shape
+            d_phys = shape[0]
+            dim_L = shape[1] * shape[2] * shape[3] # L_top * L * L_bottom
+            dim_R = shape[4] * shape[5] * shape[6] # R_top * R * R_bottom
+
+            final_tensor = temp.reshape(d_phys, dim_L, dim_R)
+            mps_tensors.append(final_tensor)
+
+        return MPS(self.Ly, self.d_phys, mps_tensors)
+    
+    def sample_1d_mps(self, row_mps):
+        """
+        Samples a configuration for a single row given its effective MPS rep
+        """
+        right_envs = [None] * self.Ly
+
+        # we start from the right and move left to compute the right environments which we will use to sample each site
+        T_rightmost = row_mps.A[self.Ly - 1]
+        env = np.sum(T_rightmost, axis=0) # sum over physical index
+        env = np.squeeze(env, axis=1) # rightmost tensor has R = 1
+        right_envs[self.Ly - 1] = env # shape = (L, )
+
+        for y in range(self.Ly - 2, 0, -1):
+            temp = np.sum(row_mps.A[y], axis = 0) # (L, R)
+            env = np.tensordot(temp, env, axes=([1],[0])) # (L, )
+
+            # Normalize to avoid numerical instability
+            env_norm = np.max(np.abs(env))
+            if env_norm > 0:
+                env /= env_norm
+
+            right_envs[y] = env
+
+        # sample from left to right
+        sampled_spins = np.zeros(self.Ly, dtype=int)
+        log_prob_row = 0.0
+
+        left_env = np.array([1.0]) # initial left env is just a scalar
+
+        for y in range(self.Ly):
+            T = row_mps.A[y] # (d_phys, L, R)
+            weights = np.zeros(self.d_phys)
+
+            # calculate weight for each possible spin state
+            for s in range(self.d_phys):
+                T_s = T[s, :, :] # slice at spin s, shape = (L, R)
+
+                temp = np.tensordot(left_env, T_s, axes=([0], [0])) # shape = (R, )
+
+                # contract with right env (if not at the rightmost site)
+                if y < self.Ly - 1:
+                    weight = np.tensordot(temp, right_envs[y+1], axes=([0], [0])) # scalar
+                else:
+                    weight = temp[0] # R = 1 at the edge
+
+                weights[s] = max(0.0, np.real(weight)) # avoid negative weights due to numerical instability
+
+            total_weight = np.sum(weights)
+            if total_weight < 1e-15:
+                probs = np.ones(self.d_phys) / self.d_phys
+            else:
+                probs = weights / total_weight
+
+            # Sample the spin
+            r = np.random.rand()
+            chosen_spin = 0 if r < probs[0] else 1
+
+            sampled_spins[y] = chosen_spin
+            log_prob_row += np.log(probs[chosen_spin]) if probs[chosen_spin] > 1e-15 else - np.inf
+
+            # update left env for next iteration
+            left_env = np.tensordot(left_env, T[chosen_spin, :, :], axes=([0], [0]))
+
+            # normalize left env to avoid numerical instability
+            env_norm = np.max(np.abs(left_env))
+            if env_norm > 0:
+                left_env /= env_norm
+            
+        return sampled_spins, log_prob_row
+    
+    def row_to_fixed_mpo(self, x, sampled_spins):
+        """
+        Converts row x into an MPO by slicing the physical legs with the sampled spins
+        """
+        mpo_tensors = []
+        for y in range(self.Ly):
+            s = sampled_spins[y]
+            T = self.A[x][y]
+
+            T_sliced = T[s, :, :, :, :] # (L, U, R, D)
+
+            T_mpo = np.transpose(T_sliced, (3, 1, 0, 2)) # MPO format = (d_out=D, d_in=U, L, R)
+            mpo_tensors.append(T_mpo)
+
+        return mpo_tensors
+    
+    def sample_config_opt(self, D_bound):
+        """
+        Optimized version of sample_configuration with O(N) complexity (instead of O(N^2))
+        """
+        current_config = np.full((self.Lx, self.Ly), -1, dtype=int)
+        log_prob_tot = 0.0
+
+        # 1. Precompute bottom and top environments
+        bottom_envs = self.compute_bottom_env(D_bound)
+        top_env = None
+
+        for x in range(self.Lx):
+            # 2. Sandwich row x between top and bottom envs to get an effective MPS rep
+            row_mps = self.eff_row_mps(x, top_env, bottom_envs[x+1] if x < self.Lx -1 else None)
+
+            # 3. Sample a config for this row
+            sampled_row_spins, row_log_prob = self.sample_1d_mps(row_mps)
+
+            current_config[x, :] = sampled_row_spins
+            log_prob_tot += row_log_prob
+
+            # 4. Fix the row and update the top env for next iter
+            fixed_row_mpo = self.row_to_fixed_mpo(x, sampled_row_spins)
+
+            if top_env is None:
+                # Row 0 is an MPO with U = 1, so we squeeze it to get an MPS
+                mps_tensors = []
+                for T_mpo in fixed_row_mpo:
+                    # T_mpo shape = (d_out=D, d_in=U=1, L, R)
+                    mps_tensors.append(np.squeeze(T_mpo, axis=1)) # (D, L, R)
+                top_env = MPS(self.Ly, self.D, mps_tensors)
+                top_env.normalize_tensors()
+            else:
+                top_env = top_env.apply_mpo(fixed_row_mpo)
+                top_env.normalize_tensors()
+                top_env.compress(max_bond_dim=D_bound)
+
+
+        return current_config, log_prob_tot
+
+
+        
