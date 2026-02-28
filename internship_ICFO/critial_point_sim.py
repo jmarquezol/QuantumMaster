@@ -56,9 +56,9 @@ if __name__ == "__main__":
     L_values = [16, 32, 64]  # Test different grid sizes (N = L x L)
     # Create a beta array with higher density near the critical point (0.44)
     beta_values = np.concatenate([
-        np.linspace(0.3, 0.4, 3),
-        np.linspace(0.41, 0.48, 8),
-        np.linspace(0.5, 0.6, 3)
+        np.linspace(0.3, 0.4, 2),
+        np.linspace(0.41, 0.48, 4),
+        np.linspace(0.5, 0.6, 2)
     ])
     
     D_bound = 2
