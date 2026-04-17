@@ -1,6 +1,7 @@
 using ITensors, ITensorMPS, Plots, LinearAlgebra
 
 """ Boundary Contraction & Sampling """
+# Note: this implementation does not allow to study frustated systems yet
 
 # 1. Create a PEPS grid
 function create_ising_peps(Lx::Int, Ly::Int, beta::Float64, J::Float64=1.0)
@@ -8,7 +9,8 @@ function create_ising_peps(Lx::Int, Ly::Int, beta::Float64, J::Float64=1.0)
     h = [Index(2, "Link,h=$x,$y") for x in 1:Lx, y in 1:Ly-1] # Horizontal bonds
     v = [Index(2, "Link,v=$x,$y") for x in 1:Lx-1, y in 1:Ly] # Vertical bonds
     
-    Q = [exp(beta*J) exp(-beta*J); exp(-beta*J) exp(beta*J)]
+    Q = [exp(beta*J) exp(-beta*J); 
+         exp(-beta*J) exp(beta*J)]
     evals, evecs = eigen(Q)
     M = evecs * diagm(sqrt.(evals)) * transpose(evecs)
     
@@ -29,8 +31,8 @@ function create_ising_peps(Lx::Int, Ly::Int, beta::Float64, J::Float64=1.0)
             vU = x > 1 ? M[spin, :] : [1.0]
             vD = x < Lx ? M[spin, :] : [1.0]
             
-            # Populate tensor dynamically
-            for iL in 1:length(vL), iR in 1:length(vR), iU in 1:length(vU), iD in 1:length(vD)
+            # Populate tensor by iterating over all combinations of the existing bounds
+            for iL in eachindex(vL), iR in eachindex(vR), iU in eachindex(vU), iD in eachindex(vD)
                 val = vL[iL] * vR[iR] * vU[iU] * vD[iD]
                 
                 assign = Pair{Index, Int}[s[x,y] => spin]
@@ -52,7 +54,6 @@ function compute_bottom_envs(A::Matrix{ITensor}, s::Matrix{Index{Int64}}, v::Mat
     bottom_envs = Vector{Union{MPS, Nothing}}(undef, Lx)
     bottom_envs[Lx] = nothing
 
-    # Standard dummy indices for ITensors apply()
     b = [Index(2, "Site,b=$y") for y in 1:Ly]
     
     # Base case: Row Lx (Trace out physical spins to form an MPS)
@@ -79,10 +80,10 @@ function compute_bottom_envs(A::Matrix{ITensor}, s::Matrix{Index{Int64}}, v::Mat
         end
         MPO_x = MPO(tensors_mpo)
         
-        # Apply row MPO to bottom environment and compress!
+        # Apply row MPO to bottom environment and compress
         curr_mps = apply(MPO_x, curr_mps; maxdim=D_bound, cutoff=1e-10)
         curr_mps = noprime(curr_mps) # Strip the prime
-        normalize!(curr_mps) # Keep numbers stable
+        normalize!(curr_mps)
 
         # Save
         bottom_envs[x] = MPS([replaceinds(curr_mps[y], b[y] => v[x-1, y]) for y in 1:Ly])
