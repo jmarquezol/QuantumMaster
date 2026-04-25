@@ -658,11 +658,11 @@ version = "0.9.21"
 
 [[deps.ITransverse]]
 deps = ["Adapt", "ITensorMPS", "ITensors", "JLD2", "LinearAlgebra", "NDTensors", "ProgressMeter", "Statistics"]
-git-tree-sha1 = "ff164186e75afbba91c5b9063885a2e4df1ccaa5"
+git-tree-sha1 = "a70590848e6127ea4af6efed93565200cf00c6a8"
 repo-rev = "main"
-repo-url = "https://github.com/starsfordummies/ITransverse.jl.git"
+repo-url = "https://github.com/starsfordummies/ITransverse.jl"
 uuid = "0b04ad49-86dd-4710-99cf-a56925ebcbe5"
-version = "0.52.1"
+version = "0.54.0"
 
     [deps.ITransverse.extensions]
     ITransverseCUDAExt = "CUDA"

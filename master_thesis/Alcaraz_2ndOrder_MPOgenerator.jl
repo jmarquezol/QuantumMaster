@@ -54,7 +54,7 @@ end
 
 # OPTMIAL 2ND ORDER MPO GENERATOR
 
-function expH_alcaraz_optimal_2nd(sites::Vector{<:Index}, lambda::Number, p::Number; dt::Number)
+function expH_alcaraz_2nd_opt(sites::Vector{<:Index}, lambda::Number, p::Number; dt::Number)
     N = length(sites)
     
     I2 = ComplexF64[1 0; 0 1]
@@ -138,3 +138,153 @@ function expH_alcaraz_optimal_2nd(sites::Vector{<:Index}, lambda::Number, p::Num
     return U_dt
 end
 
+# 1ST ORDER MPO GENERATOR
+
+function expH_alcaraz_1st_opt(sites::Vector{<:Index}, lambda::Number, p::Number; dt::Number)
+    N = length(sites)
+    
+    I2 = ComplexF64[1 0; 0 1]
+    Z  = ComplexF64[1 0; 0 -1]
+    X  = ComplexF64[0 1; 1 0]
+    O2 = ComplexF64[0 0; 0 0]
+    
+    tau = -im * dt 
+
+    D = Matrix{Matrix{ComplexF64}}(undef, 1, 1); D[1, 1] = -lambda .* X
+    C = Matrix{Matrix{ComplexF64}}(undef, 1, 3); C[1, 1] = Z; C[1, 2] = O2; C[1, 3] = X
+    B = Matrix{Matrix{ComplexF64}}(undef, 3, 1); B[1, 1] = -Z; B[2, 1] = -p .* Z; B[3, 1] = -p * lambda .* X
+    
+    A = Matrix{Matrix{ComplexF64}}(undef, 3, 3)
+    for i in 1:3, j in 1:3 A[i, j] = O2 end
+    A[1, 2] = I2
+    
+    I_op = Matrix{Matrix{ComplexF64}}(undef, 1, 1); I_op[1, 1] = I2
+
+    W11 = I_op .+ tau .* D .+ (tau^2 / 2) .* otimes(D, D)
+    W12 = C .+ (tau / 2) .* sym_sum([C, D])
+
+    W21 = tau .* B .+ (tau^2 / 2) .* sym_sum([B, D])
+    W22 = A .+ (tau / 2) .* (sym_sum([A, D]) .+ sym_sum([B, C]))
+
+
+    W_opt_1st = hvcat((2, 2), W11, W12, W21, W22)
+    
+    # Build ITensor MPO
+    dim_opt = 4
+    links = [Index(dim_opt, "Link,l=$i") for i in 1:N-1]
+    U_dt = MPO(sites)
+    
+    for i in 1:N
+        s = sites[i]
+        if i == 1
+            W = ITensor(ComplexF64, links[1], s', s)
+            for col in 1:dim_opt, s1 in 1:2, s2 in 1:2
+                W[links[1]=>col, s'=>s1, s=>s2] = W_opt_1st[1, col][s1, s2]
+            end
+            U_dt[i] = W
+        elseif i == N
+            W = ITensor(ComplexF64, links[i-1], s', s)
+            for row in 1:dim_opt, s1 in 1:2, s2 in 1:2
+                W[links[i-1]=>row, s'=>s1, s=>s2] = W_opt_1st[row, 1][s1, s2]
+            end
+            U_dt[i] = W
+        else
+            W = ITensor(ComplexF64, links[i-1], links[i], s', s)
+            for row in 1:dim_opt, col in 1:dim_opt, s1 in 1:2, s2 in 1:2
+                W[links[i-1]=>row, links[i]=>col, s'=>s1, s=>s2] = W_opt_1st[row, col][s1, s2]
+            end
+            U_dt[i] = W
+        end
+    end
+    
+    return U_dt
+end
+
+
+
+# 4x4 WII Zalatel
+
+function expH_alcaraz_WII(sites::Vector{<:Index}, lambda::Number, p::Number; dt::Number)
+    N = length(sites)
+    
+    I2 = ComplexF64[1 0; 0 1]
+    Z  = ComplexF64[1 0; 0 -1]
+    X  = ComplexF64[0 1; 1 0]
+    O2 = ComplexF64[0 0; 0 0]
+    
+    # Define Hamiltonian Blocks
+    D_op = -lambda .* X
+    C_op = [Z, O2, X]
+    B_op = [-Z, -p .* Z, -p * lambda .* X]
+    
+    A_op = fill(O2, 3, 3)
+    A_op[1, 2] = I2
+    
+    tau = -im * dt
+    
+    W_II = Matrix{Matrix{ComplexF64}}(undef, 4, 4)  # matrix 4x4 of matrices 2x2 (8x8 total)
+    
+    # we loop over all combinations of a and a_bar (from 1 to 3 possible states) 
+    # to construct the 8x8 matrix M that encodes the transition rules of the Zaletel MPO construction
+    for a in 1:3
+        for a_bar in 1:3
+            M = zeros(ComplexF64, 8, 8)
+            
+            function set_M!(i, j, mat)
+                M[2*(i-1)+1 : 2*i, 2*(j-1)+1 : 2*j] .= mat
+            end
+            
+            # Zaletel 8x8 Boson transitions
+            set_M!(1, 1, tau .* D_op)
+            
+            set_M!(2, 1, sqrt(tau) .* B_op[a])
+            set_M!(2, 2, tau .* D_op)
+            
+            set_M!(3, 1, sqrt(tau) .* C_op[a_bar])
+            set_M!(3, 3, tau .* D_op)
+            
+            set_M!(4, 1, A_op[a, a_bar])
+            set_M!(4, 2, sqrt(tau) .* C_op[a_bar])
+            set_M!(4, 3, sqrt(tau) .* B_op[a])
+            set_M!(4, 4, tau .* D_op)
+            
+    
+            E = exp(M)
+            
+            
+            W_II[1, 1] = E[1:2, 1:2]                 
+            W_II[1+a, 1] = E[3:4, 1:2]               
+            W_II[1, 1+a_bar] = E[5:6, 1:2]           
+            W_II[1+a, 1+a_bar] = E[7:8, 1:2]         
+        end
+    end
+    
+    links = [Index(4, "Link,l=$i") for i in 1:N-1]
+    U_dt = MPO(sites)
+    
+    for i in 1:N
+        s = sites[i]
+        
+        if i == 1
+            W = ITensor(ComplexF64, links[1], s', s)
+            for col in 1:4, s1 in 1:2, s2 in 1:2
+                W[links[1]=>col, s'=>s1, s=>s2] = W_II[1, col][s1, s2]
+            end
+            U_dt[i] = W
+        elseif i == N
+            W = ITensor(ComplexF64, links[i-1], s', s)
+            for row in 1:4, s1 in 1:2, s2 in 1:2
+                W[links[i-1]=>row, s'=>s1, s=>s2] = W_II[row, 1][s1, s2]
+            end
+            U_dt[i] = W
+        else
+            W = ITensor(ComplexF64, links[i-1], links[i], s', s)
+            for row in 1:4, col in 1:4, s1 in 1:2, s2 in 1:2
+                W[links[i-1]=>row, links[i]=>col, s'=>s1, s=>s2] = W_II[row, col][s1, s2]
+            end
+            U_dt[i] = W
+        end
+    end
+    
+    return U_dt
+end
