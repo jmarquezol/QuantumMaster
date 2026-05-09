@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "08b8ed01cb7224c319efdd12ce785a3c73e715b3"
+project_hash = "c20ac88bbdb667cbbd51e115c3b49bd2beb23835"
 
 [[deps.Accessors]]
 deps = ["CompositionsBase", "ConstructionBase", "Dates", "InverseFunctions", "MacroTools"]
@@ -617,6 +617,14 @@ version = "1.34.4"
     [deps.IJulia.weakdeps]
     PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
     Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+
+[[deps.ITensorExpMPO]]
+deps = ["ITensorMPS", "ITensors", "LinearAlgebra"]
+git-tree-sha1 = "66350ad1a7996d04f6d0c0c18e1862826f0e4e3e"
+repo-rev = "main"
+repo-url = "https://github.com/tipfom/ITensorExpMPO.jl"
+uuid = "bfa7688a-1ef8-413b-a2db-e5b2ff436f80"
+version = "0.1.0"
 
 [[deps.ITensorMPS]]
 deps = ["Adapt", "Compat", "ITensors", "IsApprox", "KrylovKit", "LinearAlgebra", "NDTensors", "Printf", "Random", "SerializedElementArrays", "TupleTools"]
