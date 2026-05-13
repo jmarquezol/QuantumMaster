@@ -1,16 +1,83 @@
 using ITensors, ITensorMPS
 using Combinatorics, LinearAlgebra
-using ITransverse: ModelParams, modelparams
+using ITensorExpMPO
+using ITensors: Algorithm
 
-""" Builds the optimal 2nd-order MPO Generator for the Alcaraz model (WII construction) """
 
-struct AlcarazModel <: ModelParams
-    lambda::Float64
-    p::Float64
-    phys_site::Index
+struct AlcarazWII <: ExpHRecipe end
+
+Base.@kwdef mutable struct AlcarazParams <: ModelParams
+    lambda::Float64 = 1.0
+    p::Float64      = 0.0
+    phys_site::Index{Int64} = Index(2, "S=1/2")
 end
 
-ITransverse.modelparams(mp::AlcarazModel) = (mp.lambda, mp.p)
+AlcarazParams(lambda::Number, p::Number) = AlcarazParams(; lambda=Float64(lambda), p=Float64(p))
+AlcarazParams(x::AlcarazParams; lambda=x.lambda, p=x.p) = AlcarazParams(; lambda, p, phys_site=x.phys_site)
+
+"""
+Builds the Alcaraz MPO using the automated OpSum-to-MPO Euler builder.
+Uses Algorithm("WII") exactly as specified in the package examples.
+"""
+function expH_alcaraz(sites::Vector{<:Index}, lambda::Number, p::Number; dt::Number) 
+    N = length(sites) 
+    os = OpSum() 
+
+    # Nearest-Neighbor terms 
+    for j in 1:(N - 1) 
+        os += -1.0, "Z", j, "Z", j + 1 
+        os += -p * lambda, "X", j, "X", j + 1 
+    end 
+
+    # Next-Nearest-Neighbor terms 
+    for j in 1:(N - 2) 
+        os += -p, "Z", j, "Z", j + 2 
+    end 
+
+    # On-site Transverse Field 
+    for j in 1:N 
+        os += -lambda, "X", j 
+    end 
+
+    # Time step conversion for exp(-i * H * dt) 
+    tau = -im * dt  
+     
+    # Call the expmpo function using Algorithm("WII") syntax 
+    return expmpo(os, sites, tau; alg=Algorithm("WII")) 
+     
+end
+
+function alcaraz_opsum(N::Int, lambda::Number, p::Number)
+    os = OpSum()
+
+    # Nearest-Neighbor terms
+    for j in 1:(N - 1)
+        os += -1.0, "Z", j, "Z", j + 1
+        os += -p * lambda, "X", j, "X", j + 1
+    end
+
+    # Next-Nearest-Neighbor terms
+    for j in 1:(N - 2)
+        os += -p, "Z", j, "Z", j + 2
+    end
+
+    # On-site Transverse Field
+    for j in 1:N
+        os += -lambda, "X", j
+    end
+
+    return os
+end
+
+function ITransverse.expH(sites::Vector{<:Index}, mp::AlcarazParams, ::AlcarazWII; dt::Number)
+    os = alcaraz_opsum(length(sites), mp.lambda, mp.p)
+    return expmpo(os, sites, -im * dt; alg=Algorithm("WII"))
+end
+
+
+################################################################################################################
+
+""" Builds the optimal 2nd-order MPO Generator for the Alcaraz model (WII construction) """
 
 # HELPER FUNCTIONS
 
@@ -67,13 +134,13 @@ function expH_alcaraz_2nd_opt(sites::Vector{<:Index}, lambda::Number, p::Number;
     # BASE HAMILTONIAN BLOCKS:
 
     D = Matrix{Matrix{ComplexF64}}(undef, 1, 1)
-    D[1, 1] = -lambda .* X
+    D[1, 1] = -lambda .* Z
     
     C = Matrix{Matrix{ComplexF64}}(undef, 1, 3)
-    C[1, 1] = Z; C[1, 2] = O2; C[1, 3] = X
+    C[1, 1] = Z; C[1, 2] = O2; C[1, 3] = Z
     
     B = Matrix{Matrix{ComplexF64}}(undef, 3, 1)
-    B[1, 1] = -Z; B[2, 1] = -p .* Z; B[3, 1] = -p * lambda .* X
+    B[1, 1] = -X; B[2, 1] = -p .* X; B[3, 1] = -p * lambda .* Z
     
     A = Matrix{Matrix{ComplexF64}}(undef, 3, 3)
     for i in 1:3, j in 1:3
@@ -102,7 +169,16 @@ function expH_alcaraz_2nd_opt(sites::Vector{<:Index}, lambda::Number, p::Number;
     W_opt = hvcat((3, 3, 3), W11, W12, W13, W21, W22, W23, W31, W32, W33)
     
     # Build the ITensor MPO (new bond dimension is 1 (W11) + 3 (W22) + 9 (W33) = 13)
+    # Assemble full 13x13 block matrix of 2x2 matrices
+    W_opt = hvcat((3, 3, 3), W11, W12, W13, W21, W22, W23, W31, W32, W33)
     dim_opt = 13
+    
+    # FLATTEN ONCE: Convert Matrix{Matrix} into a contiguous 4D Julia Array
+    W_dense = zeros(ComplexF64, dim_opt, dim_opt, 2, 2)
+    for row in 1:dim_opt, col in 1:dim_opt
+        W_dense[row, col, :, :] = W_opt[row, col]
+    end
+    
     links = [Index(dim_opt, "Link,l=$i") for i in 1:N-1]
     U_dt = MPO(sites)
     
@@ -110,25 +186,16 @@ function expH_alcaraz_2nd_opt(sites::Vector{<:Index}, lambda::Number, p::Number;
         s = sites[i]
         
         if i == 1
-            W = ITensor(ComplexF64, links[1], s', s)
-            for col in 1:dim_opt, s1 in 1:2, s2 in 1:2
-                W[links[1]=>col, s'=>s1, s=>s2] = W_opt[1, col][s1, s2]
-            end
-            U_dt[i] = W
+            # Slice the 4D array to a 3D array (col, s', s) taking only the 1st row
+            U_dt[i] = itensor(W_dense[1, :, :, :], links[1], s', s)
             
         elseif i == N
-            W = ITensor(ComplexF64, links[i-1], s', s)
-            for row in 1:dim_opt, s1 in 1:2, s2 in 1:2
-                W[links[i-1]=>row, s'=>s1, s=>s2] = W_opt[row, 1][s1, s2]
-            end
-            U_dt[i] = W
+            # Slice the 4D array to a 3D array (row, s', s) taking only the 1st column
+            U_dt[i] = itensor(W_dense[:, 1, :, :], links[i-1], s', s)
             
         else
-            W = ITensor(ComplexF64, links[i-1], links[i], s', s)
-            for row in 1:dim_opt, col in 1:dim_opt, s1 in 1:2, s2 in 1:2
-                W[links[i-1]=>row, links[i]=>col, s'=>s1, s=>s2] = W_opt[row, col][s1, s2]
-            end
-            U_dt[i] = W
+            # Cast the full 4D array (row, col, s', s) in one shot
+            U_dt[i] = itensor(W_dense, links[i-1], links[i], s', s)
         end
     end
     
@@ -279,145 +346,6 @@ function expH_alcaraz_WII(sites::Vector{<:Index}, lambda::Number, p::Number; dt:
             W = ITensor(ComplexF64, links[i-1], links[i], s', s)
             for row in 1:4, col in 1:4, s1 in 1:2, s2 in 1:2
                 W[links[i-1]=>row, links[i]=>col, s'=>s1, s=>s2] = W_II[row, col][s1, s2]
-            end
-            U_dt[i] = W
-        end
-    end
-    
-    return U_dt
-end
-
-using LinearAlgebra
-using ITensors
-
-function otimes(X::Matrix{Matrix{ComplexF64}}, Y::Matrix{Matrix{ComplexF64}})
-    nx, mx = size(X); ny, my = size(Y)
-    Z = Matrix{Matrix{ComplexF64}}(undef, nx * ny, mx * my)
-    for ix in 1:nx, jx in 1:mx
-        for iy in 1:ny, jy in 1:my
-            row = (ix - 1) * ny + iy
-            col = (jx - 1) * my + jy
-            Z[row, col] = X[ix, jx] * Y[iy, jy] 
-        end
-    end
-    return Z
-end
-
-function expH_alcaraz_2nd_opt_explicit(sites::Vector{<:Index}, lambda::Number, p::Number; dt::Number)
-    N = length(sites)
-    
-    I2 = ComplexF64[1 0; 0 1]
-    Z  = ComplexF64[1 0; 0 -1]
-    X  = ComplexF64[0 1; 1 0]
-    O2 = ComplexF64[0 0; 0 0]
-    
-    tau = -im * dt 
-
-    # DYNAMIC PRUNING: Keep this to protect the RTM eigensolver at p=0.0
-    if p == 0.0
-        D = Matrix{Matrix{ComplexF64}}(undef, 1, 1); D[1, 1] = -lambda .* X
-        C = Matrix{Matrix{ComplexF64}}(undef, 1, 1); C[1, 1] = Z
-        B = Matrix{Matrix{ComplexF64}}(undef, 1, 1); B[1, 1] = -Z
-        A = Matrix{Matrix{ComplexF64}}(undef, 1, 1); A[1, 1] = O2
-        dim_W = 1
-    else
-        D = Matrix{Matrix{ComplexF64}}(undef, 1, 1); D[1, 1] = -lambda .* X
-        C = Matrix{Matrix{ComplexF64}}(undef, 1, 3); C[1, 1] = Z; C[1, 2] = O2; C[1, 3] = X
-        B = Matrix{Matrix{ComplexF64}}(undef, 3, 1); B[1, 1] = -Z; B[2, 1] = -p .* Z; B[3, 1] = -p * lambda .* X
-        A = Matrix{Matrix{ComplexF64}}(undef, 3, 3)
-        for i in 1:3, j in 1:3 A[i, j] = O2 end
-        A[1, 2] = I2
-        dim_W = 3
-    end
-    
-    I_op = Matrix{Matrix{ComplexF64}}(undef, 1, 1); I_op[1, 1] = I2
-
-    # --- EXPLICIT COMBINATORIAL EXPANSION ---
-    
-    W11 = I_op .+ tau .* D .+ 
-          (tau^2 / 2) .* otimes(D, D) .+ 
-          (tau^3 / 6) .* otimes(D, otimes(D, D))
-
-    W12 = C .+ 
-          (tau / 2) .* (otimes(C, D) .+ otimes(D, C)) .+ 
-          (tau^2 / 6) .* (otimes(C, otimes(D, D)) .+ otimes(D, otimes(C, D)) .+ otimes(D, otimes(D, C)))
-
-    W13 = otimes(C, C) .+ 
-          (tau / 3) .* (otimes(C, otimes(C, D)) .+ otimes(C, otimes(D, C)) .+ otimes(D, otimes(C, C)))
-
-    W21 = tau .* B .+ 
-          (tau^2 / 2) .* (otimes(B, D) .+ otimes(D, B)) .+ 
-          (tau^3 / 6) .* (otimes(B, otimes(D, D)) .+ otimes(D, otimes(B, D)) .+ otimes(D, otimes(D, B)))
-
-    W22 = A .+ 
-          (tau / 2) .* (otimes(B, C) .+ otimes(C, B) .+ otimes(A, D) .+ otimes(D, A)) .+ 
-          (tau^2 / 6) .* (
-              otimes(C, otimes(B, D)) .+ otimes(C, otimes(D, B)) .+ 
-              otimes(B, otimes(C, D)) .+ otimes(B, otimes(D, C)) .+ 
-              otimes(D, otimes(C, B)) .+ otimes(D, otimes(B, C)) .+ 
-              otimes(A, otimes(D, D)) .+ otimes(D, otimes(A, D)) .+ otimes(D, otimes(D, A))
-          )
-
-    W23 = (otimes(A, C) .+ otimes(C, A)) .+ 
-          (tau / 3) .* (
-              otimes(A, otimes(C, D)) .+ otimes(A, otimes(D, C)) .+ 
-              otimes(C, otimes(A, D)) .+ otimes(C, otimes(D, A)) .+ 
-              otimes(D, otimes(A, C)) .+ otimes(D, otimes(C, A)) .+ 
-              otimes(C, otimes(C, B)) .+ otimes(C, otimes(B, C)) .+ otimes(B, otimes(C, C))
-          )
-
-    W31 = (tau^2 / 2) .* otimes(B, B) .+ 
-          (tau^3 / 6) .* (otimes(B, otimes(B, D)) .+ otimes(B, otimes(D, B)) .+ otimes(D, otimes(B, B)))
-
-    W32 = (tau / 2) .* (otimes(A, B) .+ otimes(B, A)) .+ 
-          (tau^2 / 6) .* (
-              otimes(A, otimes(B, D)) .+ otimes(A, otimes(D, B)) .+ 
-              otimes(B, otimes(A, D)) .+ otimes(B, otimes(D, A)) .+ 
-              otimes(D, otimes(A, B)) .+ otimes(D, otimes(B, A)) .+ 
-              otimes(B, otimes(B, C)) .+ otimes(B, otimes(C, B)) .+ otimes(C, otimes(B, B))
-          )
-
-    W33 = otimes(A, A) .+ 
-          (tau / 3) .* (
-              otimes(A, otimes(B, C)) .+ otimes(A, otimes(C, B)) .+ 
-              otimes(B, otimes(A, C)) .+ otimes(B, otimes(C, A)) .+ 
-              otimes(C, otimes(A, B)) .+ otimes(C, otimes(B, A)) .+ 
-              otimes(A, otimes(A, D)) .+ otimes(A, otimes(D, A)) .+ otimes(D, otimes(A, A))
-          )
-
-    # --- END EXPLICIT COMBINATORIAL EXPANSION ---
-
-    # Assemble full block matrix
-    W_opt = hvcat((3, 3, 3), W11, W12, W13, W21, W22, W23, W31, W32, W33)
-    
-    # Calculate exact dimension based on pruning (3 for p=0.0, 13 for p!=0.0)
-    dim_opt = 1 + dim_W + dim_W^2
-    
-    # Build ITensor MPO using strict OBC
-    links = [Index(dim_opt, "Link,l=$i") for i in 1:N-1]
-    U_dt = MPO(sites)
-    
-    for i in 1:N
-        s = sites[i]
-        
-        if i == 1
-            W = ITensor(ComplexF64, links[1], s', s)
-            for col in 1:dim_opt, s1 in 1:2, s2 in 1:2
-                W[links[1]=>col, s'=>s1, s=>s2] = W_opt[1, col][s1, s2]
-            end
-            U_dt[i] = W
-            
-        elseif i == N
-            W = ITensor(ComplexF64, links[i-1], s', s)
-            for row in 1:dim_opt, s1 in 1:2, s2 in 1:2
-                W[links[i-1]=>row, s'=>s1, s=>s2] = W_opt[row, 1][s1, s2]
-            end
-            U_dt[i] = W
-            
-        else
-            W = ITensor(ComplexF64, links[i-1], links[i], s', s)
-            for row in 1:dim_opt, col in 1:dim_opt, s1 in 1:2, s2 in 1:2
-                W[links[i-1]=>row, links[i]=>col, s'=>s1, s=>s2] = W_opt[row, col][s1, s2]
             end
             U_dt[i] = W
         end
