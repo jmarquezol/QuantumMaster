@@ -751,9 +751,7 @@ version = "1.34.4"
 
 [[deps.ITensorExpMPO]]
 deps = ["ITensorMPS", "ITensors", "LinearAlgebra"]
-git-tree-sha1 = "66350ad1a7996d04f6d0c0c18e1862826f0e4e3e"
-repo-rev = "main"
-repo-url = "https://github.com/tipfom/ITensorExpMPO.jl"
+path = "ITensorExpMPOv2.jl"
 uuid = "bfa7688a-1ef8-413b-a2db-e5b2ff436f80"
 version = "0.1.0"
 
