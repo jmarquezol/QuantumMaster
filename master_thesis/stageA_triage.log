@@ -1,0 +1,88 @@
+
+[555508] signal 15: Terminated
+in expression starting at /home/jmarquezol/Documents/masters/QuantumMaster/master_thesis/stageA_triage.jl:24
+unknown function (ip: 0x76c10da98d6f) at /lib/x86_64-linux-gnu/libc.so.6
+pthread_cond_wait at /lib/x86_64-linux-gnu/libc.so.6 (unknown line)
+uv_cond_wait at /workspace/srcdir/libuv/src/unix/thread.c:822
+ijl_task_get_next at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/scheduler.c:523
+poptask at ./task.jl:1216
+wait at ./task.jl:1228
+#wait#398 at ./condition.jl:141
+_trywait at ./asyncevent.jl:163
+profile_printing_listener at ./Base.jl:332
+#start_profile_listener##0 at ./Base.jl:352
+jfptr_YY.start_profile_listenerYY.YY.0_6779.1 at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/lib/julia/sys.so (unknown line)
+jl_apply at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/julia.h:2391 [inlined]
+start_task at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/task.c:1252
+unknown function (ip: (nil)) at (unknown file)
+_ZNK4llvm13ConstantRange3addERKS0_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution30isImpliedCondOperandsViaRangesENS_7CmpInst9PredicateEPKNS_4SCEVES5_S2_S5_S5_.part.0 at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution26isImpliedCondBalancedTypesENS_7CmpInst9PredicateEPKNS_4SCEVES5_S2_S5_S5_PKNS_11InstructionE at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution13isImpliedCondENS_7CmpInst9PredicateEPKNS_4SCEVES5_PKNS_5ValueEbPKNS_11InstructionE at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution27isLoopBackedgeGuardedByCondEPKNS_4LoopENS_7CmpInst9PredicateEPKNS_4SCEVES8_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution19isKnownViaInductionENS_7CmpInst9PredicateEPKNS_4SCEVES5_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution16isKnownPredicateENS_7CmpInst9PredicateEPKNS_4SCEVES5_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution15willNotOverflowENS_11Instruction9BinaryOpsEbPKNS_4SCEVES5_PKS1_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm15ScalarEvolution35getStrengthenedNoWrapFlagsFromBinOpEPKNS_25OverflowingBinaryOperatorE at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN12_GLOBAL__N_114SimplifyIndvar13simplifyUsersEPN4llvm7PHINodeEPNS1_9IVVisitorE.constprop.0 at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm17simplifyUsersOfIVEPNS_7PHINodeEPNS_15ScalarEvolutionEPNS_13DominatorTreeEPNS_8LoopInfoEPKNS_19TargetTransformInfoERNS_15SmallVectorImplINS_14WeakTrackingVHEEERNS_12SCEVExpanderEPNS_9IVVisitorE at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm18IndVarSimplifyPass3runERNS_4LoopERNS_15AnalysisManagerIS1_JRNS_27LoopStandardAnalysisResultsEEEES5_RNS_10LPMUpdaterE at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+run at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/usr/include/llvm/IR/PassManagerInternal.h:89
+_ZN4llvm11PassManagerINS_4LoopENS_15AnalysisManagerIS1_JRNS_27LoopStandardAnalysisResultsEEEEJS4_RNS_10LPMUpdaterEEE13runSinglePassIS1_St10unique_ptrINS_6detail11PassConceptIS1_S5_JS4_S7_EEESt14default_deleteISD_EEEESt8optionalINS_17PreservedAnalysesEERT_RT0_RS5_S4_S7_RNS_19PassInstrumentationE.isra.0 at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm11PassManagerINS_4LoopENS_15AnalysisManagerIS1_JRNS_27LoopStandardAnalysisResultsEEEEJS4_RNS_10LPMUpdaterEEE24runWithoutLoopNestPassesERS1_RS5_S4_S7_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+_ZN4llvm11PassManagerINS_4LoopENS_15AnalysisManagerIS1_JRNS_27LoopStandardAnalysisResultsEEEEJS4_RNS_10LPMUpdaterEEE3runERS1_RS5_S4_S7_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+run at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/usr/include/llvm/IR/PassManagerInternal.h:89
+_ZN4llvm25FunctionToLoopPassAdaptor3runERNS_8FunctionERNS_15AnalysisManagerIS1_JEEE at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+run at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/usr/include/llvm/IR/PassManagerInternal.h:89
+run at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/usr/include/llvm/IR/PassManager.h:543 [inlined]
+run at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/usr/include/llvm/IR/PassManagerInternal.h:89
+_ZN4llvm27ModuleToFunctionPassAdaptor3runERNS_6ModuleERNS_15AnalysisManagerIS1_JEEE at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+run at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/usr/include/llvm/IR/PassManagerInternal.h:89
+_ZN4llvm11PassManagerINS_6ModuleENS_15AnalysisManagerIS1_JEEEJEE3runERS1_RS3_ at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.18.1jl (unknown line)
+run at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/pipeline.cpp:741
+operator() at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jitlayers.cpp:1459
+withModuleDo<(anonymous namespace)::sizedOptimizerT<N>::operator()(llvm::orc::ThreadSafeModule) [with long unsigned int N = 4]::<lambda(llvm::Module&)> > at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/usr/include/llvm/ExecutionEngine/Orc/ThreadSafeModule.h:136 [inlined]
+operator() at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jitlayers.cpp:1420 [inlined]
+operator() at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jitlayers.cpp:1572 [inlined]
+addModule at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jitlayers.cpp:2031
+jl_compile_codeinst_now at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jitlayers.cpp:626
+jl_compile_codeinst_impl at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jitlayers.cpp:824
+jl_compile_method_internal at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/gf.c:3528
+_jl_invoke at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/gf.c:4006 [inlined]
+ijl_apply_generic at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/gf.c:4214
+#svd#304 at /home/jmarquezol/.julia/packages/ITensors/6hc0c/src/tensor_operations/matrix_decomposition.jl:162
+svd at /home/jmarquezol/.julia/packages/ITensors/6hc0c/src/tensor_operations/matrix_decomposition.jl:110
+unknown function (ip: 0x76c0c9136dae) at (unknown file)
+#_tlrcontract_rtm_right#157 at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/rtm_lr_contract.jl:172
+_tlrcontract_rtm_right at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/rtm_lr_contract.jl:120 [inlined]
+#tlrcontract#155 at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/rtm_lr_contract.jl:21
+tlrcontract at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/rtm_lr_contract.jl:6 [inlined]
+#tlrapply#142 at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/trunclr_apply.jl:76 [inlined]
+tlrapply at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/trunclr_apply.jl:75
+unknown function (ip: 0x76c0ca9d272f) at (unknown file)
+#tlrapply#151 at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/trunclr_apply.jl:152
+tlrapply at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/truncation_sweeps/trunclr_apply.jl:152 [inlined]
+powermethod_lr at /home/jmarquezol/.julia/packages/ITransverse/8pmYI/src/power_method/pm.jl:109
+#run_pm_diagnosed#16 at /home/jmarquezol/Documents/masters/QuantumMaster/master_thesis/dqpt_diagnostics.jl:230
+run_pm_diagnosed at /home/jmarquezol/Documents/masters/QuantumMaster/master_thesis/dqpt_diagnostics.jl:202 [inlined]
+top-level scope at /home/jmarquezol/Documents/masters/QuantumMaster/master_thesis/stageA_triage.jl:27
+jl_toplevel_eval_flex at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/toplevel.c:1024
+jl_toplevel_eval_flex at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/toplevel.c:975
+ijl_toplevel_eval at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/toplevel.c:1047
+ijl_toplevel_eval_in at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/toplevel.c:1092
+eval at ./boot.jl:489
+include_string at ./loading.jl:2870
+_include at ./loading.jl:2930
+include at ./Base.jl:306
+exec_options at ./client.jl:317
+_start at ./client.jl:550
+jfptr__start_74358.1 at /home/jmarquezol/.julia/juliaup/julia-1.12.5+0.x64.linux.gnu/lib/julia/sys.so (unknown line)
+jl_apply at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/julia.h:2391 [inlined]
+true_main at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jlapi.c:971
+jl_repl_entrypoint at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/src/jlapi.c:1139
+main at /cache/build/builder-amdci5-3/julialang/julia-release-1-dot-12/cli/loader_exe.c:58
+unknown function (ip: 0x76c10da2a1c9) at /lib/x86_64-linux-gnu/libc.so.6
+__libc_start_main at /lib/x86_64-linux-gnu/libc.so.6 (unknown line)
+unknown function (ip: 0x4010b8) at /workspace/srcdir/glibc-2.17/csu/../sysdeps/x86_64/start.S
+unknown function (ip: (nil)) at (unknown file)
+Allocations: 152471426 (Pool: 152469992; Big: 1434); GC: 28

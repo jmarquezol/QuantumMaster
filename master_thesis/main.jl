@@ -2,6 +2,7 @@ using ITensors, ITensorMPS
 using Combinatorics, LinearAlgebra
 using ITensorExpMPO
 using ITensors: Algorithm
+using ProgressMeter
 
 # note: to update the new version of ITensorExpMPO, go to the julia terminal, activate the env, and then run:
 # dev ./ITensorExpMPOv2.jl/
@@ -217,61 +218,7 @@ end
 
 
 ####################################################################################################################################
-Base.@kwdef mutable struct BenchmarkParams <: ModelParams
-    lambda::Float64 = 0.0
-    p::Float64 = 0.0
-    phys_site::Index{Int64} = Index(2, "S=1/2")
-end
 
-BenchmarkParams(lambda::Number, p::Number) = BenchmarkParams(; lambda=Float64(lambda), p=Float64(p))
-BenchmarkParams(x::BenchmarkParams; lambda=x.lambda, p=x.p) = BenchmarkParams(; lambda, p, phys_site=x.phys_site)
-
-# Recipe Hierarchy for Multiple Dispatch
-abstract type AbstractBenchmarkRecipe <: ExpHRecipe end
-struct BenchmarkWI  <: AbstractBenchmarkRecipe end
-struct BenchmarkWII <: AbstractBenchmarkRecipe end
-struct BenchmarkVD2 <: AbstractBenchmarkRecipe end
-
-_alg_string(::BenchmarkWI)  = "WI"
-_alg_string(::BenchmarkWII) = "WII"
-_alg_string(::BenchmarkVD2) = "VD2"
-
-"""
-Builds a custom Ising Hamiltonian as an OpSum
-"""
-function benchmark_opsum(N::Int, lambda::Number, p::Number)
-    os = OpSum()
-
-    # Nearest-Neighbor terms
-    for j in 1:(N - 1)
-        os += -1.0, "Z", j, "Z", j + 1
-        # os += -p * lambda, "X", j, "X", j + 1
-    end
-
-    # Next-Nearest-Neighbor terms
-    for j in 1:(N - 2)
-        os += -p, "Z", j, "Z", j + 2
-    end
-
-    # On-site Transverse Field
-    for j in 1:N
-        os += -lambda, "X", j
-    end
-
-    return os
-end
-
-
-function expH_benchmark(sites::Vector{<:Index}, lambda::Number, p::Number; dt::Number, mpo_alg::String="VD2") 
-    os = benchmark_opsum(length(sites), lambda, p)
-    tau = -im * dt  
-    return expmpo(os, sites, tau; alg=Algorithm(mpo_alg)) 
-end
-
-function ITransverse.expH(sites::Vector{<:Index}, mp::BenchmarkParams, recipe::AbstractBenchmarkRecipe; dt::Number)
-    os = benchmark_opsum(length(sites), mp.lambda, mp.p)
-    return expmpo(os, sites, -im * dt; alg=Algorithm(_alg_string(recipe)))
-end
 
 
 
