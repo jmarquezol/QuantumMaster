@@ -657,5 +657,92 @@ class PEPS:
 
         return current_config, log_prob_tot
 
+    # ----------------------------------------------------------------
+    # Deterministic proposal log-probability  log q(config)
+    # (added for the mixing-time study; Python twin of the Julia
+    #  tools/tnmh_tools.jl `proposal_logprob`. Mirrors sample_config_opt
+    #  with the per-row draw replaced by pinning to a supplied config.)
+    # ----------------------------------------------------------------
+    def sample_1d_mps_pinned(self, row_mps, pinned_spins):
+        """
+        Deterministic twin of sample_1d_mps: at each site use pinned_spins[y]
+        instead of drawing. Returns log q(row | environment).
+        """
+        right_envs = [None] * self.Ly
+
+        T_rightmost = row_mps.A[self.Ly - 1]
+        env = np.sum(T_rightmost, axis=0)
+        env = np.squeeze(env, axis=1)
+        right_envs[self.Ly - 1] = env
+
+        for y in range(self.Ly - 2, 0, -1):
+            temp = np.sum(row_mps.A[y], axis=0)
+            env = np.tensordot(temp, env, axes=([1], [0]))
+            env_norm = np.max(np.abs(env))
+            if env_norm > 0:
+                env /= env_norm
+            right_envs[y] = env
+
+        log_prob_row = 0.0
+        left_env = np.array([1.0])
+
+        for y in range(self.Ly):
+            T = row_mps.A[y]
+            weights = np.zeros(self.d_phys)
+            for s in range(self.d_phys):
+                T_s = T[s, :, :]
+                temp = np.tensordot(left_env, T_s, axes=([0], [0]))
+                if y < self.Ly - 1:
+                    weight = np.tensordot(temp, right_envs[y+1], axes=([0], [0]))
+                else:
+                    weight = temp[0]
+                weights[s] = max(0.0, np.real(weight))
+
+            total_weight = np.sum(weights)
+            if total_weight < 1e-15:
+                probs = np.ones(self.d_phys) / self.d_phys
+            else:
+                probs = weights / total_weight
+
+            chosen_spin = int(pinned_spins[y])
+            log_prob_row += np.log(probs[chosen_spin]) if probs[chosen_spin] > 1e-15 else -np.inf
+
+            left_env = np.tensordot(left_env, T[chosen_spin, :, :], axes=([0], [0]))
+            env_norm = np.max(np.abs(left_env))
+            if env_norm > 0:
+                left_env /= env_norm
+
+        return log_prob_row
+
+    def proposal_logprob(self, config, D_bound):
+        """
+        Deterministic log q(config) for an arbitrary pinned config
+        (Lx x Ly array of 0/1). Mirrors sample_config_opt step-for-step
+        (including the unused last-row top_env update) so the result equals
+        the sampler's returned log q for any drawn config.
+        Returns the scalar log q(config).
+        """
+        config = np.asarray(config, dtype=int)
+        log_prob_tot = 0.0
+
+        bottom_envs = self.compute_bottom_env(D_bound)
+        top_env = None
+
+        for x in range(self.Lx):
+            row_mps = self.eff_row_mps(x, top_env, bottom_envs[x+1] if x < self.Lx - 1 else None)
+            log_prob_tot += self.sample_1d_mps_pinned(row_mps, config[x, :])
+
+            fixed_row_mpo = self.row_to_fixed_mpo(x, config[x, :])
+            if top_env is None:
+                mps_tensors = [np.squeeze(T_mpo, axis=1) for T_mpo in fixed_row_mpo]
+                top_env = MPS(self.Ly, self.D, mps_tensors)
+                top_env.normalize_tensors()
+            else:
+                top_env = top_env.apply_mpo(fixed_row_mpo)
+                top_env.normalize_tensors()
+                top_env.compress(max_bond_dim=D_bound)
+
+        return log_prob_tot
+
 
         
