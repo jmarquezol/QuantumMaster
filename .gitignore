@@ -1,0 +1,9 @@
+# Python virtual environments
+internship_ICFO/py/icfo_intern/
+internship_ICFO/py/icfo_env/
+internship_ICFO/py/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Julia
+internship_ICFO/jl/icfo_intern/Manifest.toml
