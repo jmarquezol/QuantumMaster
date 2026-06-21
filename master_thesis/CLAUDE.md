@@ -4,6 +4,9 @@
 # Supervisor: Stefano Carignano (BSC)
 # Period: February–September 2026
 
+>>> NEW SESSION: read CONTINUATION.md FIRST — it is the latest handoff (session state, current
+>>> results, and the prioritized next-steps plan: make the block PM cheaper, then fix NB7 p=0.1).
+
 ---
 
 ## 1. PROJECT GOAL
